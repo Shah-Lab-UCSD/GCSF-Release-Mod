@@ -1,0 +1,88 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Fri Sep 24 09:24:54 2021
+
+@author: User
+"""
+
+from scipy import integrate
+from scipy import interpolate
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.colors as colors
+from matplotlib import cm
+#These import modules that I use a lot. You will pretty much ALWAYS use numpy and matploylib.pyplot
+#The other ones are because I'm going to be doing a lot of differential equation solving, so I
+#imported integrate. I probably don't need interpolate.
+
+def GCSF(C_G, t, params):
+    
+    [Gs, Gb] = C_G
+
+    [z, Vs, ka, Gprod, kren, X, kint, Kd] = params
+    
+    #amount of GCSF release in nanograms per hour
+    if t < 12*24:
+        dmGCSFdt = 0.00129634*np.exp(-0.006138*t)*1000
+        N = 1.398/24*t
+    elif t <= 21*24:
+        dmGCSFdt = 0.00308596*np.exp(-0.004115*(t - 384))*1000 #Decay starting at D12
+        N = (10.86*(t-13)/24 + 17.5)
+    else:
+        dmGCSFdt = 0.00308596*np.exp(-0.004115*(t-384) )*1000 #decay starting at D12
+        N = 100
+    dGs = 2*dmGCSFdt/Vs - ka*Gs
+    
+    dGb = z*ka*Gs + Gprod - kren*Gb - N*X*kint*Gb**2/(Gb**2 + Kd**2)
+    
+    dG = [dGs, dGb]
+    
+    return dG
+
+#Define Parameters/relevant geometries
+#ratio of subq volume to peripheral blood
+z = 60/2000
+
+#subq volume in mL
+Vs = 150/1000
+
+# transfer constant from subq to not subq space in 1/hr
+ka = 13.5/24
+
+#endogenous rate of GCSF production in ng/mL/hr
+Gprod = 0.2535/24
+
+#renal clearance rate constant in 1/hr
+kren = 10.3/24
+
+#normalization factor 
+X= 0.0246/100
+
+#receptor internalization rate
+kint = 114.48/24
+
+#dissociation constant
+Kd = 1.44
+
+# Package parameters
+params = [z, Vs, ka, Gprod, kren, X, kint, Kd]
+
+
+
+#Set step sizes to solve for, set velocity at boundary
+t0 = np.linspace(0,40*24,40*24 + 1)
+G0 = [0, 0.0246]
+
+GOut = integrate.odeint(GCSF, G0, t0, args=(params,))
+
+fig, ax1 = plt.subplots()
+ax1.plot(t0/24, GOut[:,0],'b-')
+ax1.set_xlabel('Time (Days)')
+ax1.set_ylabel('SubQ (ng/mL)',color = 'b')
+
+fig, ax2 = plt.subplots()
+ax2.plot(t0/24,GOut[:,1],'r-')
+ax2.set_xlabel('Time (Days)')
+ax2.set_ylabel('Peripheral Blood (ng/mL)', color ='r')
+ax2.legend(['GCSF Concentration'])
+
